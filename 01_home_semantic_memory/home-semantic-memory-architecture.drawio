@@ -1,0 +1,289 @@
+<mxfile host="app.diagrams.net" modified="2026-03-31T00:00:00.000Z" agent="Claude" version="21.0.0">
+  <diagram name="家庭语义记忆系统 IO 流程图" id="home-semantic-memory-io">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2800" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ===== 标题 ===== -->
+        <mxCell id="title" value="家庭语义记忆系统——各层 IO 流程图" style="text;html=1;fontSize=20;fontStyle=1;align=center;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="700" y="20" width="1400" height="36" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             VLM 采集入口（左侧纵列）
+        ================================================================ -->
+        <mxCell id="vlm_bg" value="" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;strokeWidth=2;opacity=40;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="250" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="vlm_label" value="VLM 在线拓扑建图&#xa;（采集入口）" style="text;html=1;fontStyle=1;fontSize=11;align=center;fillColor=none;strokeColor=none;fontColor=#7d6000;" vertex="1" parent="1">
+          <mxGeometry x="40" y="88" width="250" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="v_robot" value="机器人导航执行" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="75" y="150" width="180" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="v_sample" value="满足采样条件&#xa;（位移/角度/时间）" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="75" y="218" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="v_vlm" value="图像 + 约束提示词 → VLM&#xa;输出：{可见物品, 显著变化}" style="rounded=1;whiteSpace=wrap;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="75" y="300" width="180" height="72" as="geometry" />
+        </mxCell>
+        <mxCell id="v_match" value="归属已有区域？" style="rhombus;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="85" y="394" width="160" height="78" as="geometry" />
+        </mxCell>
+        <mxCell id="v_trans" value="空间切换检测" style="rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="75" y="494" width="180" height="46" as="geometry" />
+        </mxCell>
+        <mxCell id="v_sediment" value="定期沉淀触发&#xa;L2 → L1" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="75" y="562" width="180" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="v_slam" value="几何地图 / SLAM&#xa;（底层运动基础设施）&#xa;避障 · 路径规划 · 回充" style="rounded=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#888888;fontSize=10;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="75" y="640" width="180" height="78" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_v1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="v_robot" target="v_sample" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="v_sample" target="v_vlm" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v3" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="v_vlm" target="v_match" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e_v4" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="v_match" target="v_trans" parent="1"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <!-- ================================================================
+             L2：动态事件层
+        ================================================================ -->
+        <mxCell id="l2_bg" value="" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=2;opacity=40;" vertex="1" parent="1">
+          <mxGeometry x="330" y="80" width="620" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="l2_title" value="L2：动态事件层（高频写入 · 7天详细 + 压缩摘要）" style="text;html=1;fontStyle=1;fontSize=11;align=center;fillColor=none;strokeColor=none;fontColor=#1a4f8a;" vertex="1" parent="1">
+          <mxGeometry x="330" y="88" width="620" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2_obs" value="观测事件 Observation Event&#xa;────────────&#xa;event_id / timestamp&#xa;zone（所属区域）&#xa;vlm_output:&#xa;  visible_objects[]&#xa;  new_objects[]&#xa;  unseen_objects[]" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="360" y="150" width="250" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2_obj" value="对象状态事件 Object State Event&#xa;────────────&#xa;event_id / timestamp&#xa;object_category&#xa;last_seen_room&#xa;&#xa;（由 visible_objects 派生写入）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="650" y="150" width="260" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2_trans_ev" value="空间切换事件 Room Transition Event&#xa;────────────&#xa;event_id / timestamp&#xa;from_room&#xa;to_room&#xa;&#xa;（多次重复 → 强化邻接关系）" style="rounded=1;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="360" y="390" width="250" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l2_sediment_box" value="L2 → L1 沉淀机制（定期触发）&#xa;────────────&#xa;① 区域物品记忆沉淀&#xa;   new_objects evidence++ → remembered_objects 加入&#xa;   unseen_objects evidence→0 → remembered_objects 删除&#xa;② 可移动对象位置沉淀&#xa;   Object State 累计 N 次 → habitual_locations 更新&#xa;③ 新房间发现 → 创建 Room Node&#xa;④ 邻接关系强化 → Room.neighbors 更新&#xa;⑤ 遗忘衰减 → evidence_count 自然下降" style="rounded=1;whiteSpace=wrap;fillColor=#b3d4f5;strokeColor=#6c8ebf;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="360" y="610" width="550" height="190" as="geometry" />
+        </mxCell>
+
+        <!-- VLM → L2 写入 -->
+        <mxCell id="e_vlm_obs" value="是/否均写入" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" source="v_match" target="l2_obs" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_vlm_trans" value="切换事件" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" source="v_trans" target="l2_trans_ev" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_obs_obj" value="visible_objects 派生" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;" edge="1" source="l2_obs" target="l2_obj" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sed_trig" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.5;dashed=1;" edge="1" source="v_sediment" target="l2_sediment_box" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             L1：语义结构层
+        ================================================================ -->
+        <mxCell id="l1_bg" value="" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;strokeWidth=2;opacity=40;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="80" width="620" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="l1_title" value="L1：语义结构层（低频写入 · 长期有效 · 家庭空间稳定骨架）" style="text;html=1;fontStyle=1;fontSize=11;align=center;fillColor=none;strokeColor=none;fontColor=#2a6020;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="88" width="620" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1_room" value="Room Node&#xa;────────────&#xa;id / type&#xa;neighbors[]&#xa;bbox {cx,cy,w,h}&#xa;last_confirmed" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="150" width="220" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1_zone" value="Zone Node&#xa;────────────&#xa;id / parent_room&#xa;bbox {cx,cy,w,h}&#xa;anchor_objects[]&#xa;remembered_objects[&#xa;  {category, evidence_count}&#xa;]" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="150" width="290" height="200" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1_anchor" value="Anchor Object Node&#xa;────────────&#xa;id / category&#xa;canonical_room&#xa;canonical_zone&#xa;bbox {cx,cy,w,h}&#xa;position_relative" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="350" width="220" height="190" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1_movable" value="Movable Object Node&#xa;────────────&#xa;id / category&#xa;habitual_locations[&#xa;  {room, evidence_count}&#xa;]&#xa;last_confirmed_location&#xa;  {room, source:vlm}&#xa;last_confirmed_at" style="rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="390" width="290" height="220" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l1_design" value="设计要点&#xa;────────────&#xa;· L1 只存节点与直接归属关系&#xa;  （对象→区域→房间→邻接房间）&#xa;· bbox 一旦确认即冻结&#xa;· 节点不随单次观测失效&#xa;· 复杂语义关系由 L3 按需推导" style="rounded=1;whiteSpace=wrap;fillColor=#b0d9a8;strokeColor=#82b366;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="630" width="550" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- L2 沉淀 → L1 -->
+        <mxCell id="e_sed_room" value="③④ Room / neighbors" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="l2_sediment_box" target="l1_room" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sed_zone" value="① remembered_objects" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="l2_sediment_box" target="l1_zone" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_sed_mov" value="② habitual_locations" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=2;exitX=1;exitY=0.6;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" edge="1" source="l2_sediment_box" target="l1_movable" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             L3：记忆服务层
+        ================================================================ -->
+        <mxCell id="l3_bg" value="" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=2;opacity=40;" vertex="1" parent="1">
+          <mxGeometry x="1690" y="80" width="600" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="l3_title" value="L3：记忆服务层（按需组装 · 无状态翻译层）" style="text;html=1;fontStyle=1;fontSize=11;align=center;fillColor=none;strokeColor=none;fontColor=#5b2d8a;" vertex="1" parent="1">
+          <mxGeometry x="1690" y="88" width="600" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3_index" value="轻量派生索引（可重建 · 非事实源）&#xa;────────────&#xa;· object_location_index（找物加速）&#xa;· zone_snapshot_baseline（巡逻基线）&#xa;· room_summary_cache（摘要加速）" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="150" width="540" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3_obj_search" value="找物 Object Search&#xa;────────────&#xa;输入：目标对象类别&#xa;① L1 habitual_locations 排序候选房间&#xa;② L1 Zone remembered_objects 定位区域&#xa;③ L2 最近 Object State Event 辅助&#xa;输出：优先探索区域有序列表 + 概率" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="310" width="540" height="170" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3_person" value="找人 Person Search&#xa;────────────&#xa;输入：目标人物 / 全局搜索&#xa;① L2 历史 Observation Event 聚合统计&#xa;   visible_objects 含人物类别&#xa;② 按区域/时间排序高频活动位置&#xa;输出：房间排序 + 最近观测时间" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="500" width="540" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l3_patrol" value="巡逻异常检测 Patrol Anomaly Detection&#xa;────────────&#xa;输入：当次巡逻各区域观测事件&#xa;① new/unseen vs Zone.remembered_objects 差分&#xa;   低：临时物品变化&#xa;   中：可移动对象连续 unseen → 触发 Object State&#xa;② not_expected_in 语义规则命中 → 高危告警&#xa;输出：异常区域 + 等级（低/中/高）" style="rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="1720" y="680" width="540" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- L1 → L3 -->
+        <mxCell id="e_l1_l3_mov" value="habitual_locations" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#9673a6;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.4;entryDx=0;entryDy=0;" edge="1" source="l1_movable" target="l3_obj_search" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l1_l3_zone_obj" value="remembered_objects（找物）" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#9673a6;strokeWidth=1.5;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.6;entryDx=0;entryDy=0;" edge="1" source="l1_zone" target="l3_obj_search" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l1_l3_zone_patrol" value="remembered_objects（巡逻基线）" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#9673a6;strokeWidth=1.5;exitX=1;exitY=0.95;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" source="l1_zone" target="l3_patrol" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- L2 → L3 -->
+        <mxCell id="e_l2_l3_obj" value="最近 Object State Event" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.8;entryDx=0;entryDy=0;" edge="1" source="l2_obj" target="l3_obj_search" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l2_l3_person" value="visible_objects 聚合统计" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="l2_obs" target="l3_person" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l2_l3_patrol" value="new/unseen_objects（当次巡逻）" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.9;exitDx=0;exitDy=0;entryX=0;entryY=0.1;entryDx=0;entryDy=0;" edge="1" source="l2_obs" target="l3_patrol" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             L4：用户展示层
+        ================================================================ -->
+        <mxCell id="l4_bg" value="" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=2;opacity=40;" vertex="1" parent="1">
+          <mxGeometry x="2350" y="80" width="380" height="760" as="geometry" />
+        </mxCell>
+        <mxCell id="l4_title" value="L4：用户展示层（用户可见）" style="text;html=1;fontStyle=1;fontSize=11;align=center;fillColor=none;strokeColor=none;fontColor=#7a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="2350" y="88" width="380" height="28" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l4_overview" value="房间总览视图&#xa;────────────&#xa;卡片列表 + 邻接关系连线&#xa;（由 L1 Room Node 驱动）&#xa;降级：邻接置信不足→仅列表" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2380" y="150" width="320" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l4_sketch" value="语义布局草图&#xa;────────────&#xa;由 L1 邻接关系 + bbox 生成&#xa;只画相对关系，不画精确坐标&#xa;标注&quot;示意图&quot;，不确定区域弱化&#xa;降级：约束不足→不生成" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2380" y="310" width="320" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l4_detail" value="房间详情视图&#xa;────────────&#xa;常见物品（L1 Zone remembered_objects）&#xa;最近变化（L2 Observation Event）&#xa;锚点对象位置（L1 Anchor Node）&#xa;用户纠错入口" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2380" y="490" width="320" height="160" as="geometry" />
+        </mxCell>
+
+        <mxCell id="l4_task" value="任务结果展示&#xa;────────────&#xa;找物路线展示&#xa;找人房间定位&#xa;巡逻异常告警（低/中/高）&#xa;（由 L3 输出驱动）" style="rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=8;fontSize=10;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="2380" y="680" width="320" height="130" as="geometry" />
+        </mxCell>
+
+        <!-- L1 → L4 直驱 -->
+        <mxCell id="e_l1_l4_room" value="Room Node → 总览 + 草图" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=1.5;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="l1_room" target="l4_overview" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l1_l4_sketch" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=1.5;exitX=1;exitY=0.4;exitDx=0;exitDy=0;entryX=0;entryY=0.2;entryDx=0;entryDy=0;" edge="1" source="l1_room" target="l4_sketch" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l1_l4_detail_zone" value="remembered_objects" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.2;entryDx=0;entryDy=0;" edge="1" source="l1_zone" target="l4_detail" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l1_l4_detail_anchor" value="Anchor Node" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#82b366;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="l1_anchor" target="l4_detail" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- L2 → L4 最近变化 -->
+        <mxCell id="e_l2_l4" value="最近变化" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#6c8ebf;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="l2_obs" target="l4_detail" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- L3 → L4 -->
+        <mxCell id="e_l3_l4_obj" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="l3_obj_search" target="l4_task" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l3_l4_person" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" edge="1" source="l3_person" target="l4_task" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l3_l4_patrol" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="l3_patrol" target="l4_task" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             用户纠错回写 L1
+        ================================================================ -->
+        <mxCell id="user_correction" value="用户纠错（通过 L4 详情视图纠错入口）" style="ellipse;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1810" y="930" width="420" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="e_l4_correct" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=1.5;" edge="1" source="l4_detail" target="user_correction" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e_correct_l1" value="回写 L1（habitual_locations 权重更新）" style="edgeStyle=orthogonalEdgeStyle;fontSize=9;strokeColor=#b85450;strokeWidth=2;dashed=1;fontStyle=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="user_correction" target="l1_movable" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- ================================================================
+             图例
+        ================================================================ -->
+        <mxCell id="legend_bg" value="" style="rounded=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;" vertex="1" parent="1">
+          <mxGeometry x="40" y="920" width="460" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" value="图例" style="text;html=1;fontStyle=1;fontSize=12;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="58" y="930" width="60" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_sed" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#82b366;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="970" as="sourcePoint" /><mxPoint x="140" y="970" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="leg_sed_l" value="L2→L1 沉淀 / L1→L4 直读" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="155" y="960" width="280" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_l3" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#9673a6;strokeWidth=2;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="1000" as="sourcePoint" /><mxPoint x="140" y="1000" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="leg_l3_l" value="L1/L2→L3 组装 / L3→L4 输出" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="155" y="990" width="290" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_l2" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#6c8ebf;strokeWidth=1.5;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="1030" as="sourcePoint" /><mxPoint x="140" y="1030" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="leg_l2_l" value="L2→L3/L4 直读（虚线）" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="155" y="1020" width="280" height="20" as="geometry" />
+        </mxCell>
+
+        <mxCell id="leg_corr" value="" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#b85450;strokeWidth=2;dashed=1;" edge="1" parent="1">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="1060" as="sourcePoint" /><mxPoint x="140" y="1060" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="leg_corr_l" value="用户纠错回写 L1（虚线）" style="text;html=1;fontSize=10;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="155" y="1050" width="280" height="20" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
