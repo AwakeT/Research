@@ -14,10 +14,67 @@
 | **频率架构** | 低频主策略层 + 高频轻量层 |
 | **Token预算** | Student: 450-900 token/次（按任务级别分档） |
 | **输入契约** | Student: 1组双目+2个单目（PDCP量产基线） |
-| **记忆设计** | 显式记忆库（room graph、target belief map、furniture relations） |
+| **记忆设计** | **L1-L2-L3-L4四层记忆系统**：L1语义结构层（Room/Zone/Anchor Object/Movable Object四类节点）→ L2动态事件层（Observation/ObjectState/RoomTransition三类事件）→ L3记忆服务层（按需组装，不持久化）→ L4人可理解界面 |
 | **部署目标** | S100 Pro / RK3588量产；Jetson Orin AGX研究 |
 | **训练范式** | Teacher多阶段训练 + 蒸馏到Student |
 | **蒸馏损失** | 0.4×region_ranking + 0.3×location_cls + 0.2×next_action + 0.1×confidence |
+
+### Kinbot记忆系统详细设计（内部文档第五节）
+
+Kinbot的记忆系统采用**L1-L2-L3-L4四层分层式家庭语义存储架构**，结合几何美化分区的前期验证效果与去几何地图分区的构思，形成面向VLN任务的完整记忆体系。
+
+#### 分层总览
+
+| 层级 | 名称 | 定位 | 更新频率 | 持久化 |
+|---|---|---|---|---|
+| **L1** | 语义结构层 | 家庭空间的长期稳定骨架 | 低频，多次观测沉淀后写入 | 是 |
+| **L2** | 动态事件层 | "最近发生什么"的真实来源 | 高频，VLM每次采样写入 | 时间窗口保留（近7天详细，更早压缩摘要） |
+| **L3** | 记忆服务层 | 翻译层，按需组装给消费者 | 查询时实时推导 | 否（用完即丢） |
+| **L4** | 人可理解界面 | 面向用户展示 | — | — |
+
+#### L1 语义结构层 — 四类核心节点
+
+| 节点类型 | 字段 | 特性 |
+|---------|------|------|
+| **Room Node** | id / type / neighbors / bbox / last_confirmed | bbox多次观测稳定后**冻结**，不随单次观测更新 |
+| **Zone Node** | id / parent_room / bbox / anchor_objects / remembered_objects | bbox由多锚点物品位置共同推断后冻结；`remembered_objects`由L2沉淀写入（evidence_count超阈值加入，归零删除） |
+| **Anchor Object Node** | id / category / canonical_room / canonical_zone / bbox / position_relative | 大型不易移动家具（门、沙发、茶几、冰箱、床、柜子等）；含自然语言`position_relative`辅助LLM消费 |
+| **Movable Object Memory Node** | id / category / habitual_locations[] / last_confirmed_location | 可移动物品（药箱、遥控器等）；`habitual_locations`记录多房间+evidence_count分布；位置粒度仅到**房间级** |
+
+**L1 设计要点**：
+- 只存**直接归属关系**（对象→区域、区域→房间、房间→邻接房间），复杂语义关系由L3查询时按需推导
+- bbox一旦确认即**冻结**，仅在结构发生显著变化时重算
+- 节点不随单次观测失效——累计多次观测触发沉淀或结构变化才更新
+- L1记录的是**长期语义事实**，不直接吞并原始观测噪声
+
+#### L2 动态事件层 — 三类事件
+
+| 事件类型 | 内容 | 用途 |
+|---------|------|------|
+| **Observation Event** | event_id / timestamp / zone / vlm_output {visible_objects, new_objects, unseen_objects} | VLM单次采样结果；`new_objects`=相比上次新出现，`unseen_objects`=上次可见但本次消失 |
+| **Object State Event** | event_id / timestamp / object_category / last_seen_room | 可移动对象最近一次被观测到的房间；驱动更新`habitual_locations` |
+| **Room Transition Event** | event_id / timestamp / from_room / to_room | 房间切换事件；多次重复用于强化L1 `neighbors`邻接关系 |
+
+**L2→L1 沉淀机制**（核心数据流）：
+- **区域物品记忆沉淀**：某对象在某区域`evidence_count`超阈值 → 加入L1 Zone的`remembered_objects`；长期出现在`unseen_objects` → evidence_count归零 → 从`remembered_objects`删除
+- **可移动对象位置更新**：Object State Event累计出现N次 → 更新L1 Movable Object的`habitual_locations`分布
+- **新房间发现**：多次未匹配已有房间的观测 → 触发L1新节点创建
+- **邻接关系强化**：Room Transition Event多次重复 → 强化L1 `neighbors`
+- **遗忘衰减**：L1节点长期无L2证据支撑 → `evidence_count`自然下降，不直接删除节点
+
+#### L3 记忆服务层 — 按需组装
+
+L3不作为事实源，负责把L1+L2转化为下游消费者（任务执行、LLM、推理引擎）可用的形态：
+
+| 推导关系 | 来源 | 示例 |
+|---------|------|------|
+| `habitually_found_in` | L1可移动对象habitual_locations | 药箱→客厅+沙发区 |
+| `not_expected_in` | 常识规则+L2历史缺席统计 | 清洁剂→儿童房 |
+| `used_for` | VLM描述聚合 | 阳台+柜子区→收纳清洁工具 |
+
+**任务场景**：
+- **找物（Object Search）**：L3组装候选房间（按habitual_locations概率排序）+ 区域内优先探索区域（Zone的remembered_objects匹配）+ 排除低概率房间
+- **找人（Person Search）**：按历史活动频率排序房间列表 + 最近观测时间
 
 ---
 
@@ -46,7 +103,7 @@
 | **输出形式** | 端到端连续动作 | 结构化认知判断 | **根本差异**：VLingNav直接输出底盘控制，Kinbot明确不输出动作 |
 | **训练范式** | 预训练+SFT+RL | Teacher多阶段训练+蒸馏 | VLingNav在同一模型上完成全流程，Kinbot分离Teacher/Student |
 | **训练资源** | 128×A100（极高） | 未明确，但蒸馏路线资源需求更可控 | Kinbot蒸馏路线在训练资源上更友好 |
-| **记忆设计** | 参数化记忆（VLingMem嵌入模型） | 显式记忆库（room graph等外挂结构） | Kinbot记忆更可解释、可调试 |
+| **记忆设计** | 参数化记忆（VLingMem嵌入模型） | L1-L2-L3-L4四层显式记忆（Room/Zone/AnchorObj/MovableObj节点+事件流+按需服务层） | Kinbot记忆更可解释、可调试、有遗忘衰减机制 |
 | **Token效率** | 未明确限制 | 严格450-900 token预算 | Kinbot对端侧部署约束更严格 |
 | **视觉输入** | 视频流（动态FPS采样） | 关键帧+结构化摘要 | Kinbot更节省输入token |
 | **推理频率** | 每步推理（~2.5 FPS） | 低频主策略+高频轻量层 | Kinbot双频设计更适合端侧 |
@@ -171,7 +228,7 @@
 | **指令分解** | Plan阶段→锚点接地子目标序列 | 搜索顺序建议输出 | 目标类似：将长指令分解为可执行子步骤 |
 | **双FOV** | 前向三视角+全景 | 1组双目+2个单目（PDCP） | 视角分离思路一致，但EmergeNav用全景，Kinbot用量产相机 |
 | **频率分离** | 高频局部控制+低频边界验证 | 低频主策略+高频轻量层 | **高度相似**的频率分离设计 |
-| **记忆设计** | STM+LTM双层显式记忆 | room graph+target belief map显式记忆 | 都选择显式记忆，但粒度不同 |
+| **记忆设计** | STM+LTM双层显式记忆 | L1-L2-L3四层（L1长期骨架+L2动态事件+L3按需服务） | 都选择显式记忆分层，Kinbot分层更系统（L2→L1沉淀机制+遗忘衰减） |
 | **模型规模** | 8B/32B（推理时） | 4B Student部署 | Kinbot 4B更适合端侧 |
 
 ### 可行性评估
@@ -215,7 +272,7 @@
 | **规划机制** | 前沿评分（语义+几何+惩罚） | 区域排序 + 搜索顺序建议 | MetaNav在度量空间规划，Kinbot在语义空间规划 |
 | **反思机制** | LLM停滞检测+纠正规则生成 | 搜索失败恢复建议 | 目标类似，但MetaNav有显式停滞检测 |
 | **执行频率** | 固定N_replan步重规划 | 低频主策略+高频轻量层 | MetaNav更简单直接 |
-| **记忆结构** | 情节缓冲（短期+长期） | 显式记忆库 | 都选择显式记忆 |
+| **记忆结构** | 情节缓冲（短期+长期） | L1-L2-L3四层（L1语义骨架+L2动态事件流+L3按需组装） | 都选择分层显式记忆；MetaNav情节缓冲≈Kinbot L2事件层；MetaNav长期摘要≈Kinbot L2→L1沉淀 |
 | **云端依赖** | GPT-4o云端API | 端侧自主 | Kinbot更适合量产 |
 
 ### 可行性评估
@@ -375,7 +432,7 @@
 | **任务覆盖** | 5大任务统一 | VLN为NFM的一个能力切片 | 目标类似：通用导航基础模型 |
 | **视觉输入** | 270°全景RGB + 视觉记忆 | 1双目+2单目（PDCP） | ABot-N0视野更广，Kinbot受限于量产相机 |
 | **频率设计** | VLA 2Hz + 控制器10Hz | 低频主策略+高频轻量层 | 本质类似的双频分层 |
-| **记忆设计** | 4层拓扑记忆（Block→Road→Function→Object/POI） | room graph + target belief map + furniture relations | ABot-N0层级更丰富，Kinbot更聚焦室内 |
+| **记忆设计** | 4层拓扑记忆（Block→Road→Function→Object/POI） | L1-L2-L3四层（L1: Room→Zone→AnchorObj/MovableObj语义骨架 + L2: 动态事件流 + L3: 按需服务层） | 均为四层层级设计；ABot-N0面向室外（Block/Road），Kinbot面向室内（Room/Zone）；Kinbot有独立L2事件层+L2→L1沉淀机制+遗忘衰减，ABot-N0无显式动态事件层 |
 | **边缘部署** | Jetson Orin NX（157 TOPS, 16GB），2Hz，性能降3% | S100 Pro / RK3588 / Jetson Orin AGX | ABot-N0已验证边缘部署，Kinbot目标类似 |
 | **真机平台** | Unitree Go2 + 3×RGB + 4D LiDAR + RTK | 未明确机器人形态 | ABot-N0已完成真机闭环验证 |
 
@@ -436,14 +493,15 @@
 
 | 对比维度 | INHerit-SG | Kinbot | 差异分析 |
 |---------|-----------|--------|---------|
-| **空间表示** | Floor-Room-Area-Object四层场景图 | room graph + target belief map + furniture relations | **高度相似**的层级语义表示，INHerit-SG层级更完整（含Floor/Area层） |
-| **语义锚点** | 自然语言描述作为显式语义锚点 | 结构化JSON认知判断 | 都选择显式可解释表示，INHerit-SG用自然语言，Kinbot用结构化JSON |
-| **地图更新** | 事件触发式（语义事件驱动） | 低频主策略层更新 | INHerit-SG更精细——仅在语义变化时更新，Kinbot按频率分层 |
-| **检索方式** | RAG管线：查询分解→过滤→验证 | 区域排序 + 搜索顺序建议 | INHerit-SG的RAG范式更系统化，可处理复杂约束和否定逻辑 |
+| **空间表示** | Floor-Room-Area-Object四层场景图 | L1语义结构层：Room→Zone→Anchor Object/Movable Object | **高度相似**的层级设计：INHerit-SG的Area≈Kinbot的Zone，INHerit-SG的Object≈Kinbot的Anchor/Movable Object二分法；Kinbot额外区分锚点（冻结位置）与可移动对象（仅记房间级分布） |
+| **语义锚点** | 自然语言描述作为显式语义锚点 | Anchor Object含`position_relative`自然语言描述（如"靠近西墙窗边"） | **高度一致**：都用自然语言作为显式语义锚点辅助LLM消费 |
+| **地图更新** | 事件触发式（语义事件驱动） | L2事件触发→沉淀写入L1（evidence_count超阈值/结构变化时） | **理念一致**：都是事件触发式更新；Kinbot通过L2→L1沉淀机制实现，有显式遗忘衰减（evidence_count自然下降） |
+| **动静分离** | 未明确区分动态/静态信息 | L1静态骨架（冻结bbox）+ L2动态事件流（高频采样） | Kinbot的L1/L2读写隔离更明确：L2高频写入不污染L1，仅通过沉淀机制定期更新 |
+| **检索方式** | RAG管线：查询分解→过滤→验证 | L3记忆服务层按需组装（habitually_found_in / not_expected_in / used_for推导） | INHerit-SG的RAG范式更系统化；Kinbot L3也是查询时推导不持久化，但推导规则较简单 |
 | **双过程架构** | 几何分割流（实时）+ 语义推理流（异步） | 低频主策略 + 高频轻量层 | **理念一致**：实时计算与耗时推理解耦 |
 | **视觉感知** | SAM3 + DINOv3 | Student VLM统一处理 | INHerit-SG用专用视觉模型，Kinbot用VLM端到端 |
-| **记忆持久性** | 增量式构建，长期一致性维护 | 显式记忆库（room graph等） | INHerit-SG强调增量更新+长期一致性，Kinbot类似但未详述更新策略 |
-| **查询复杂度** | 支持否定逻辑、复合约束、权重分配 | 指令解析为目标/区域/约束 | INHerit-SG查询能力更强，可处理"不在X附近的Y" |
+| **遗忘机制** | 无显式遗忘 | evidence_count双向机制（沉淀加入+遗忘衰减）+ 时间窗口保留 | Kinbot有显式遗忘设计，更符合真实家庭场景（物品会被移走） |
+| **查询复杂度** | 支持否定逻辑、复合约束、权重分配 | L3支持`not_expected_in`等否定关系推导 | INHerit-SG查询能力更丰富，Kinbot L3可扩展 |
 
 ### 可行性评估
 - **场景图构建管线**：INHerit-SG的SAM3+DINOv3+VLM管线在线构建场景图，计算开销较大，但异步双过程设计缓解了实时性问题。Kinbot的4B Student难以同时运行SAM3+DINOv3+VLM，但层级表示思路完全适用。
@@ -451,21 +509,22 @@
 - **不是VLN方法而是场景表示+检索方法**：INHerit-SG解决的是"如何表示环境"和"如何检索目标"，不直接输出导航动作。这与Kinbot的设计理念高度一致——Kinbot也不输出动作，而是输出认知判断。
 
 ### Kinbot可参考点
-1. **Floor-Room-Area-Object四层层级**（极高价值）：这是对Kinbot room graph + furniture relations的完整层级化升级方案。Kinbot当前的记忆设计可以直接参考此层级：
-   - Floor层 → 楼层级别（多楼层场景）
-   - Room层 → 对应Kinbot的room graph节点
-   - Area层 → 房间内功能区域划分（如"客厅沙发区"、"客厅电视区"）—— Kinbot缺少此粒度
-   - Object层 → 对应Kinbot的furniture relations和target belief map
-   - **Area层是Kinbot可以新增的关键层级**，填补Room和Object之间的语义空白。
-2. **自然语言语义锚点**（高价值）：INHerit-SG用自然语言描述替代隐式特征嵌入作为节点语义表示。Kinbot的显式记忆库中，每个room/furniture节点可以附带自然语言描述（如"靠窗的深色木质书柜"），使记忆与用户指令直接可对齐，无需额外的嵌入对齐步骤。
-3. **事件触发式地图更新**（高价值）：仅在语义事件发生时更新图结构（而非固定频率），与Kinbot的低频策略层理念一致但更精细。Kinbot可以在记忆更新中引入类似的事件触发机制——仅在"发现新物体"、"进入新房间"、"目标状态变化"时更新记忆图，而非每个低频周期都更新。
-4. **RAG检索管线**（高价值）：查询分解（多角色LLM）→ 硬到软过滤评分 → VLM最终验证的三步检索管线，可以直接应用于Kinbot的目标搜索流程：
+1. **Floor-Room-Area-Object四层层级**（极高价值→已部分吸收）：Kinbot的L1层级（Room→Zone→Anchor Object/Movable Object）与INHerit-SG的F-R-A-O**高度对齐**：
+   - Floor层 → Kinbot暂未设计（可扩展至多楼层场景）
+   - Room层 → 对应Kinbot L1 Room Node
+   - Area层 → **对应Kinbot L1 Zone Node**（如"zone_sofa_area"，含anchor_objects和remembered_objects）
+   - Object层 → 对应Kinbot L1 Anchor Object Node + Movable Object Memory Node
+   - Kinbot的Zone层**已经填补了Room和Object之间的语义空白**，且进一步将Object二分为锚点（位置冻结）和可移动（仅记房间级分布），比INHerit-SG的统一Object层更精细。
+2. **自然语言语义锚点**（高价值→已吸收）：Kinbot的Anchor Object Node已包含`position_relative`字段（如"靠近西墙窗边"），与INHerit-SG的自然语言锚点理念**一致**。可进一步扩展到Room Node和Zone Node也附带自然语言描述。
+3. **事件触发式地图更新**（高价值→已吸收）：Kinbot的L2→L1沉淀机制本质上就是事件触发式更新——仅当L2 Observation Event中的evidence_count累计超阈值时才写入L1。这与INHerit-SG"仅在有意义的语义事件发生时重组图结构"的设计**理念一致**。Kinbot还额外具备**遗忘衰减**能力（evidence_count自然下降→删除节点），是INHerit-SG所不具备的。
+4. **RAG检索管线**（高价值）：查询分解→硬到软过滤评分→VLM最终验证的三步检索管线，可以增强Kinbot L3记忆服务层的查询能力：
    - 查询分解 → 用户指令解析为原子约束（"红色的"+"沙发旁边的"+"不在卧室的"）
-   - 硬过滤 → 排除不满足硬约束的区域（如"不在卧室"）
-   - 软评分 → 对候选区域按语义相关度+距离代价排序
+   - 硬过滤 → L3利用L1 `not_expected_in`规则排除不满足硬约束的区域
+   - 软评分 → L3利用L1 `habitual_locations`概率排序候选区域
    - VLM验证 → 到达候选位置后视觉确认
-5. **否定逻辑处理**（中价值）：INHerit-SG显式处理查询中的否定约束（"不在X附近的Y"），这是当前VLN方法普遍忽视的能力。Kinbot在指令解析中加入否定约束处理，可以提升对复杂指令的理解能力。
-6. **轻量化设计思路——点云替换为轻量引用**（中价值）：INHerit-SG将重型点云替换为轻量引用，将地图从"几何容器"转变为"知识库"。Kinbot的记忆设计也应遵循此原则——存储语义描述+空间关系，而非存储原始感知数据。
+   - Kinbot L3当前的推导规则较简单（habitually_found_in / not_expected_in / used_for），INHerit-SG的RAG管线提供了更系统化的查询分解和评分方法。
+5. **否定逻辑处理**（中价值）：INHerit-SG显式处理否定约束（"不在X附近的Y"），Kinbot L3已支持`not_expected_in`推导，但仅基于常识规则+缺席统计，可参考INHerit-SG扩展更丰富的否定逻辑。
+6. **轻量化设计思路——点云替换为轻量引用**（中价值→已吸收）：Kinbot L1已遵循此原则——存储语义描述（`position_relative`）+空间关系（`neighbors`/`anchor_objects`），而非存储原始感知数据。Zone Node的bbox由锚点物品位置推断，不存储点云。
 
 ---
 
@@ -484,7 +543,7 @@
 | **CapNav** | 评测基准 | N/A | N/A | N/A | N/A | N/A | N/A |
 | **ABot-N0** | 统一VLA基础模型 | 认知预热+SFT+SAFE-GRPO | 连续轨迹5路点(x,y,θ) | 4层拓扑记忆 | VLA 2Hz+控制器10Hz | Qwen3-4B | Unitree Go2, Jetson Orin NX |
 | **INHerit-SG** | **层级场景图+RAG检索** | **零样本（基础模型组合）** | **检索结果（非导航动作）** | **F-R-A-O四层场景图** | **事件触发式异步更新** | **SAM3+DINOv3+LLM+VLM** | **真实环境验证** |
-| **Kinbot** | Teacher蒸馏Student | 多阶段训练+蒸馏 | 结构化认知JSON | 显式记忆库 | 低频+高频双层 | 27B→4B | 量产目标 |
+| **Kinbot** | Teacher蒸馏Student | 多阶段训练+蒸馏 | 结构化认知JSON | **L1-L2-L3-L4四层记忆**（L1语义骨架+L2事件流+L3按需服务） | 低频+高频双层 | 27B→4B | 量产目标 |
 
 ### 10.2 Kinbot可参考性评分
 
@@ -504,15 +563,15 @@
 
 | Kinbot阶段 | 最相关论文 | 可参考内容 |
 |-----------|---------|---------|
-| **P0 空间理解/地图/基础空间记忆** | INHerit-SG, MetaNav, EmergeNav, ABot-N0 | INHerit-SG的F-R-A-O四层层级+自然语言锚点；MetaNav的3D语义地图+前沿提取；EmergeNav的GIPE感知提取；ABot-N0的4层拓扑记忆 |
+| **P0 空间理解/地图/基础空间记忆** | INHerit-SG, MetaNav, EmergeNav, ABot-N0 | Kinbot L1层级已与INHerit-SG F-R-A-O对齐（Zone≈Area），可参考INHerit-SG RAG管线增强L3服务层；L2→L1沉淀+遗忘衰减是Kinbot独有优势；MetaNav情节缓冲≈L2事件层；ABot-N0的4层拓扑记忆面向室外 |
 | **P0 结构化输出设计** | EmergeNav, SFCo-Nav, ABot-N0 | PST分离的输出接口；子目标链生成；ABot-N0推理头+动作头双头分离 |
 | **P0 Token优化** | CapNav, EmergeNav | 视觉预算实验结论；GIPE目标条件化过滤 |
-| **P1-high 搜索与恢复** | INHerit-SG, MetaNav, SFCo-Nav, ABot-N0 | INHerit-SG的RAG检索管线（查询分解→过滤→验证）；停滞检测+反思纠正；情节惩罚防重复搜索；ABot-N0自反思重规划 |
+| **P1-high 搜索与恢复** | INHerit-SG, MetaNav, SFCo-Nav, ABot-N0 | INHerit-SG的RAG检索管线可增强L3找物/找人场景的查询能力；MetaNav停滞检测+反思纠正；情节惩罚防重复搜索；ABot-N0自反思重规划 |
 | **P1-high 多视角** | EmergeNav | 双FOV角色分离（前向高频+全景低频） |
 | **P1-medium 深度/几何** | CapNav | 维度忽视警示+评测方法论 |
 | **P1-low RL优化** | NavGRPO, VLingNav, ABot-N0 | GRPO算法+奖励设计；自适应CoT激活策略；ABot-N0 SAFE-GRPO复合奖励 |
 | **双频/事件驱动架构** | SFCo-Nav, EmergeNav, INHerit-SG, ABot-N0 | 慢-快动态切换置信度机制；高频-低频FOV分离；INHerit-SG事件触发式异步更新；ABot-N0 VLA 2Hz+控制器10Hz |
-| **记忆/地图设计** | INHerit-SG, MetaNav, ABot-N0 | INHerit-SG将地图定义为RAG知识库+四层层级+语言锚点；MetaNav两层情节记忆；ABot-N0四层拓扑记忆 |
+| **记忆/地图设计** | INHerit-SG, MetaNav, ABot-N0 | Kinbot L1层级（Room→Zone→AnchorObj/MovableObj）与INHerit-SG F-R-A-O**已对齐**；L2事件层+L2→L1沉淀机制是Kinbot独有优势；INHerit-SG的RAG检索管线可增强L3服务层；MetaNav情节缓冲≈L2事件层设计；ABot-N0四层拓扑记忆面向室外，Kinbot面向室内 |
 | **评测体系** | CapNav | 能力条件化评测框架+智能体档案 |
 | **训练数据建设** | ABot-N0, VLingNav, NavGRPO | ABot-N0 Data Engine（16.9M轨迹数据飞轮）；Nav-AdaCoT数据集构建；Hard Case Replay |
 | **边缘部署验证** | ABot-N0 | Qwen3-4B在Jetson Orin NX上2Hz推理仅降3%性能 |
@@ -527,11 +586,13 @@
 
 1. **双频/双速/事件驱动架构是主流趋势**：SFCo-Nav（慢-快）、EmergeNav（高频-低频FOV）、MetaNav（固定间隔重规划）、ABot-N0（VLA 2Hz+控制器10Hz）、INHerit-SG（事件触发式异步更新）都独立地采用了类似的"不是每步都做完整推理"设计，且CapNav的thinking模式实验（+6.87%准确度但8×延迟）从评测角度证实了这一点。
 
-2. **显式层级化记忆优于参数化记忆**：EmergeNav（STM+LTM）、MetaNav（情节缓冲）、ABot-N0（4层拓扑记忆）、INHerit-SG（Floor-Room-Area-Object四层场景图）都选择了显式层级化记忆。特别是INHerit-SG和ABot-N0的四层层级设计，与Kinbot的room graph理念高度一致但更系统化。VLingNav虽然用参数化VLingMem取得了好效果，但其7B模型规模和128×A100训练成本不适合Kinbot场景。
+2. **显式层级化记忆优于参数化记忆**：EmergeNav（STM+LTM）、MetaNav（情节缓冲）、ABot-N0（4层拓扑记忆）、INHerit-SG（Floor-Room-Area-Object四层场景图）都选择了显式层级化记忆。**Kinbot的L1-L2-L3-L4四层记忆系统在设计完成度上已处于领先水平**——L1语义骨架（Room→Zone→AnchorObj/MovableObj）与INHerit-SG的F-R-A-O层级高度对齐，L2动态事件层+L2→L1沉淀机制+遗忘衰减是所有9篇论文中唯一具备的动静分离+显式遗忘设计，L3按需服务层（不持久化，查询时推导）与INHerit-SG的"地图作为知识库"理念一致。VLingNav虽然用参数化VLingMem取得了好效果，但其7B模型规模和128×A100训练成本不适合Kinbot场景。
 
 3. **结构化输出是可行路线**：EmergeNav的PST分离输出、SFCo-Nav的子目标链、MetaNav的前沿评分+反思规则，都是不同形式的"结构化认知判断"，与Kinbot的JSON输出理念一致。ABot-N0的推理头+动作头双头分离进一步证明了"推理与决策解耦"的必要性。
 
-7. **地图作为知识库而非几何容器**（新增）：INHerit-SG将场景图重新定义为"RAG-ready知识库"，用自然语言描述作为语义锚点。这一范式转换与Kinbot的显式记忆库设计理念一致——存储的不是原始感知数据，而是结构化的语义知识。
+7. **地图作为知识库而非几何容器**：INHerit-SG将场景图重新定义为"RAG-ready知识库"，用自然语言描述作为语义锚点。**Kinbot的L1-L3设计已完整体现这一范式**——L1存储语义描述（`position_relative`自然语言）+空间关系（`neighbors`/`anchor_objects`），L3按需组装推导关系（`habitually_found_in`/`not_expected_in`/`used_for`）供LLM消费，不存储原始感知数据。
+
+8. **动静分离+遗忘衰减是记忆系统的关键能力**（新增）：9篇论文中均未设计显式的遗忘机制——INHerit-SG、ABot-N0的拓扑记忆只增不减，MetaNav的情节缓冲有时间窗口但无衰减。**Kinbot的L2→L1沉淀机制（evidence_count双向：超阈值加入/归零删除）+L2时间窗口保留（近7天详细/更早压缩）是所有方案中最完善的记忆生命周期管理**。这对真实家庭场景至关重要——物品会被移走、房间功能会变化。
 
 4. **Token预算控制有实验支持**：CapNav证明了64帧视觉预算的收益递减，SFCo-Nav证明了50%+Token减少不影响性能，MetaNav证明了20.7%VLM查询减少不影响成功率。
 
@@ -543,7 +604,7 @@
 
 按优先级排序：
 
-1. **INHerit-SG的F-R-A-O四层层级+RAG检索管线**（→ P0记忆/地图设计）：直接升级Kinbot的room graph为Floor-Room-Area-Object四层层级；用自然语言锚点替代隐式嵌入；采用RAG范式（查询分解→硬软过滤→验证）作为目标搜索流程。**Area层是Kinbot当前缺少的关键粒度**。
+1. **INHerit-SG的RAG检索管线 → 增强Kinbot L3记忆服务层**（→ P0记忆/地图设计）：Kinbot L1层级（Room→Zone→AnchorObj/MovableObj）与INHerit-SG的F-R-A-O**已基本对齐**（Zone≈Area，AnchorObj/MovableObj二分法比统一Object更精细）。当前差距主要在L3服务层的查询能力——INHerit-SG的RAG管线（查询分解→硬到软过滤→VLM验证）比Kinbot L3当前的简单规则推导更系统化，**建议将RAG范式引入L3以增强复杂指令的检索能力**。
 2. **ABot-N0的三阶段课程学习+数据构建方法论**（→ Teacher训练范式+数据建设）：认知预热→SFT→RL的渐进训练+20%推理回放防遗忘策略可直接映射到Kinbot Teacher训练阶段；互联网视频伪轨迹+3D合成+真机演示的数据飞轮可指导训练数据建设。
 3. **SFCo-Nav的置信度驱动切换**（→ 双频架构改进）：在高频层引入置信度度量，动态决定是否触发低频层完整推理。
 4. **MetaNav的停滞检测+反思机制**（→ P1-high搜索恢复）：将停滞检测公式化，实现轻量版停滞触发+反思推理。
