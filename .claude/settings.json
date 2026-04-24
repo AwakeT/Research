@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/zktian3/.openclaw/credentials/**)",
+      "Read(//home/zktian3/.openclaw/workspace-coder/**)",
+      "Read(//home/zktian3/.claude/sessions/**)",
+      "Read(//home/zktian3/.codex/**)",
+      "Read(//home/zktian3/.claude/ide/**)",
+      "Read(//home/zktian3/.claude/plugins/**)",
+      "Read(//home/zktian3/.claude/telemetry/**)",
+      "Read(//home/zktian3/.codex/log/**)",
+      "Read(//home/zktian3/.claude/backups/**)",
+      "Read(//home/zktian3/.claude/session-env/**)",
+      "Read(//home/zktian3/.claude/shell-snapshots/**)"
+    ]
+  }
+}
