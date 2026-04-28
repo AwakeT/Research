@@ -45,6 +45,16 @@
 
 两者在维度、层数、注意力结构上**完全一致**，中间特征提取点也高度吻合。Qwen3-VL 有**可分离的独立 ViT**，可以作为共享视觉骨干。这意味着可以复用 VLM 已有的 ViT，而不必额外引入 DINOv2。
 
+### 1.5 为什么不能使用 Qwen3.5 架构
+
+本方案基于 Qwen3-VL 而非更新的 Qwen3.5，原因有二：
+
+1. **ViT 不可分离**：Qwen3.5 采用 early fusion 统一多模态架构，视觉编码器与语言模型通过早期融合训练深度耦合，不再像 Qwen3-VL 那样拥有独立可分离的 ViT 模块。我们的方案核心前提是"冻结共享 ViT、仅训练下游头"，这要求 ViT 能被独立提取和复用，Qwen3.5 的架构无法满足这一点。
+
+2. **架构不再同构**：Qwen3.5 的骨干从标准 Transformer 换成了 Gated DeltaNet + sparse MoE 混合架构，视觉特征的表示与处理方式也随之改变。LingBot-Map 的 GCA、Camera Head、DPT Head 均基于标准 ViT 特征设计（与 DINOv2 ViT-L 同构），Qwen3.5 的特征空间与之不再兼容，无法直接复用现有模块。
+
+综上，Qwen3-VL 的"独立 ViT + 后融合"架构是本方案可行的关键前提。
+
 ---
 
 ## 2. LingBot-Map 原始参数分布
